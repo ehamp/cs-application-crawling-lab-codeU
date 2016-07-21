@@ -5,9 +5,13 @@ import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.jsoup.nodes.Node;
+import org.jsoup.nodes.TextNode;
 
 import redis.clients.jedis.Jedis;
 
@@ -24,6 +28,8 @@ public class WikiCrawler {
 	
 	// fetcher used to get pages from Wikipedia
 	final static WikiFetcher wf = new WikiFetcher();
+
+	private Set<String> seen = new HashSet<String>();
 
 	/**
 	 * Constructor.
@@ -54,9 +60,27 @@ public class WikiCrawler {
 	 * @throws IOException
 	 */
 	public String crawl(boolean testing) throws IOException {
-        // FILL THIS IN!
-		return null;
+		String next = queue.poll();
+		if(testing == true){
+			seen.add(next);
+			Elements paragraphs = wf.readWikipedia(next);
+			index.indexPage(next, paragraphs);
+			queueInternalLinks(paragraphs);
+			return next;
+		}
+		else {
+			if(seen.contains(next)){
+				return null;
+			}
+			else{
+				seen.add(next);
+				Elements paragraphs = wf.fetchWikipedia(next);
+				index.indexPage(next, paragraphs);
+				queueInternalLinks(paragraphs);
+				return next;
+			}
 	}
+}
 	
 	/**
 	 * Parses paragraphs and adds internal links to the queue.
@@ -65,7 +89,15 @@ public class WikiCrawler {
 	 */
 	// NOTE: absence of access level modifier means package-level
 	void queueInternalLinks(Elements paragraphs) {
-        // FILL THIS IN!
+		for(Element para : paragraphs){
+			for(Element e : para.select("a[href]")){
+				String link = e.attr("href");
+				if(link.contains("/wiki/")){
+					link = "https://en.wikipedia.org" + link;
+					queue.offer(link);
+				}
+		    }
+		}
 	}
 
 	public static void main(String[] args) throws IOException {
